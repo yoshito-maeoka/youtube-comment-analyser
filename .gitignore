@@ -9,6 +9,7 @@ yarn-error.log
 
 # Output files
 analysis-results.json
+*-comments.json
 
 # IDE and editor files
 .vscode/

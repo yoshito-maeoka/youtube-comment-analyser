@@ -1,5 +1,7 @@
 const { google } = require('googleapis');
 const { program } = require('commander');
+const fs = require('fs');
+
 require('dotenv').config();
 
 // YouTube API setup
@@ -45,6 +47,14 @@ async function getYoutubeComments(videoId, apiKey) {
 }
 
 // Comment analysis functions
+function splitIntoChunks(array, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 function analyzeComments(comments) {
   // Basic sentiment analysis (very simplified)
   const positiveKeywords = ['good', 'great', 'love', 'amazing', 'excellent', 'awesome', 'thanks', 'thank you'];
@@ -89,12 +99,25 @@ function analyzeComments(comments) {
 }
 
 // Main function to run the analysis
-async function analyzeYoutubeComments(videoId, apiKey) {
+async function analyzeYoutubeComments(videoId, apiKey, writeChunks = false) {
   try {
     console.log(`Fetching comments for video: ${videoId}`);
     const comments = await getYoutubeComments(videoId, apiKey);
     console.log(`Retrieved ${comments.length} comments`);
     
+    // Split and save comments into chunks if writeChunks option is enabled
+    if (writeChunks) {
+      const commentChunks = splitIntoChunks(comments, 100);
+      console.log(`Split comments into ${commentChunks.length} chunks of 100 comments each`);
+      
+      // Save each chunk to a separate file
+      commentChunks.forEach((chunk, index) => {
+        const filename = `${videoId}-chunk-${index + 1}-comments.json`;
+        fs.writeFileSync(filename, JSON.stringify(chunk, null, 2));
+        console.log(`Saved chunk ${index + 1} to ${filename}`);
+      });
+    }
+
     const analysis = analyzeComments(comments);
     
     console.log('\nComment Analysis:');
@@ -127,6 +150,7 @@ program
   .version('1.0.0')
   .requiredOption('-v, --video-id <videoId>', 'YouTube video ID')
   .option('-o, --output <filename>', 'Output file for analysis results', 'analysis-results.json')
+  .option('-w, --write-chunks', 'Write comments into separate chunk files')
   .action(async (options) => {
     if (!process.env.YOUTUBE_API_KEY) {
       console.error('Error: YOUTUBE_API_KEY not found in .env file');
@@ -136,10 +160,9 @@ program
     }
 
     try {
-      const result = await analyzeYoutubeComments(options.videoId, process.env.YOUTUBE_API_KEY);
+      const result = await analyzeYoutubeComments(options.videoId, process.env.YOUTUBE_API_KEY, options.writeChunks);
       
       // Save results to file
-      const fs = require('fs');
       fs.writeFileSync(options.output, JSON.stringify(result, null, 2));
       console.log(`\nAnalysis results saved to ${options.output}`);
     } catch (err) {
