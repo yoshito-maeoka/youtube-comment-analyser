@@ -1,14 +1,21 @@
 const { google } = require('googleapis');
 const { program } = require('commander');
 const fs = require('fs');
+const https = require('https');
 
 require('dotenv').config();
 
+// Create an HTTPS agent that forces IPv4
+const httpsAgent = new https.Agent({
+  family: 4 // Force IPv4
+});
+
 // YouTube API setup
-async function getYoutubeComments(videoId, apiKey) {
+async function getYoutubeComments(videoId, apiKey, useIPv4 = false) {
   const youtube = google.youtube({
     version: 'v3',
-    auth: apiKey
+    auth: apiKey,
+    ...(useIPv4 && { agent: httpsAgent })
   });
 
   let comments = [];
@@ -22,7 +29,6 @@ async function getYoutubeComments(videoId, apiKey) {
         maxResults: 100,
         pageToken: nextPageToken
       });
-
       const items = response.data.items;
       
       items.forEach(item => {
@@ -99,10 +105,10 @@ function analyzeComments(comments) {
 }
 
 // Main function to run the analysis
-async function analyzeYoutubeComments(videoId, apiKey, writeChunks = false) {
+async function analyzeYoutubeComments(videoId, apiKey, writeChunks = false, useIPv4 = false) {
   try {
     console.log(`Fetching comments for video: ${videoId}`);
-    const comments = await getYoutubeComments(videoId, apiKey);
+    const comments = await getYoutubeComments(videoId, apiKey, useIPv4);
     console.log(`Retrieved ${comments.length} comments`);
     
     // Split and save comments into chunks if writeChunks option is enabled
@@ -148,10 +154,11 @@ program
   .name('youtube-comment-analyzer')
   .description('Analyze comments from a YouTube video')
   .version('1.0.0')
-  .requiredOption('-v, --video-id <videoId>', 'YouTube video ID')
+  .argument('<videoId>', 'YouTube video ID')
   .option('-o, --output <filename>', 'Output file for analysis results', 'analysis-results.json')
   .option('-w, --write-chunks', 'Write comments into separate chunk files')
-  .action(async (options) => {
+  .option('-4, --ipv4', 'Force IPv4 connection')
+  .action(async (videoId, options) => {
     if (!process.env.YOUTUBE_API_KEY) {
       console.error('Error: YOUTUBE_API_KEY not found in .env file');
       console.error('Please create a .env file with your YouTube API key:');
@@ -160,7 +167,7 @@ program
     }
 
     try {
-      const result = await analyzeYoutubeComments(options.videoId, process.env.YOUTUBE_API_KEY, options.writeChunks);
+      const result = await analyzeYoutubeComments(videoId, process.env.YOUTUBE_API_KEY, options.writeChunks, options.ipv4);
       
       // Save results to file
       fs.writeFileSync(options.output, JSON.stringify(result, null, 2));
