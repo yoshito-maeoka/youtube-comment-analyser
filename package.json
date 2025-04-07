@@ -1,7 +1,7 @@
 {
-  "name": "@yoshito-maeoka/ayc",
+  "name": "@yoshito-maeoka/yca",
   "bin": {
-    "ayc": "index.js"
+    "yca": "bin/cli.js"
   },
   "dependencies": {
     "commander": "^13.1.0",
